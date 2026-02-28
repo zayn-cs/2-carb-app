@@ -249,11 +249,11 @@ export default function Auth() {
         )}
         <Card className="w-full max-w-lg shadow-xl border-border/50">
           <CardHeader className="text-center space-y-2">
-            <div className="mx-auto w-16 h-16 rounded-xl bg-primary/10 flex items-center justify-center">
+            <div className="mx-auto w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center shadow-inner border border-primary/20">
               <img
                 src="https://www.mdn.dz/site_principal/sommaire/presentation/images/insignes/dcc.png"
                 alt="DCC Logo"
-                className="h-8 w-8 object-contain"
+                className="h-16 w-16 object-contain drop-shadow-md"
               />
             </div>
             <CardTitle className="text-2xl font-bold">{isLogin ? "DCC CENTER" : "DCC CENTER"}</CardTitle>

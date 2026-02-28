@@ -50,12 +50,14 @@ export default function Dashboard() {
             <EntityPage config={currentEntity} />
           ) : (
             <div className="flex flex-col items-center justify-center h-[calc(100vh-3.5rem)] text-center p-6">
-              <img 
-                src="https://www.mdn.dz/site_principal/sommaire/presentation/images/insignes/dcc.png" 
-                alt="DCC Logo" 
-                className="h-16 w-16 text-primary/30 mb-4"
-              />
-              <h2 className="text-2xl font-bold text-foreground mb-2">Bienvenue sur DCC-Lab</h2>
+              <div className="w-32 h-32 rounded-3xl bg-primary/5 flex items-center justify-center border border-primary/10 shadow-sm mb-6">
+                <img
+                  src="https://www.mdn.dz/site_principal/sommaire/presentation/images/insignes/dcc.png"
+                  alt="DCC Logo"
+                  className="h-20 w-20 object-contain drop-shadow-md opacity-90"
+                />
+              </div>
+              <h2 className="text-3xl font-bold text-foreground mb-3">Bienvenue sur DCC-Lab</h2>
               <p className="text-muted-foreground max-w-md">
                 Sélectionnez une entité dans le menu pour commencer à gérer vos données.
               </p>

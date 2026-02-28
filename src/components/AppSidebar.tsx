@@ -39,15 +39,15 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-4 border-b border-gray-200">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-            <img 
-              src="https://www.mdn.dz/site_principal/sommaire/presentation/images/insignes/dcc.png" 
-              alt="DCC Logo" 
-              className="h-4 w-4"
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center shadow-sm">
+            <img
+              src="https://www.mdn.dz/site_principal/sommaire/presentation/images/insignes/dcc.png"
+              alt="DCC Logo"
+              className="h-8 w-8 object-contain drop-shadow-md"
             />
           </div>
-          <span className="font-bold text-lg text-white">DCC-Lab</span>
+          <span className="font-bold text-xl text-white tracking-wide">DCC-Lab</span>
         </div>
       </SidebarHeader>
 
