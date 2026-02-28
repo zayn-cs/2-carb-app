@@ -20,10 +20,10 @@ export const AnimatedBackground: React.FC = () => {
     window.addEventListener("resize", setDimensions);
     setDimensions();
 
-    const particleCount = Math.floor((window.innerWidth * window.innerHeight) / 15000); // responsive count
-    const connectionDistance = 120;
+    const particleCount = Math.floor((window.innerWidth * window.innerHeight) / 9000); // more particles
+    const connectionDistance = 150; // longer connection distance
     const particles: Particle[] = [];
-    const colors = ["rgba(255, 255, 255, 0.8)", "rgba(224, 242, 254, 0.7)", "rgba(255, 255, 255, 0.5)"]; // white variants to stand out on color
+    const colors = ["rgba(255, 255, 255, 1)", "rgba(255, 255, 255, 0.9)", "rgba(224, 242, 254, 1)"]; // solid whites to stand out
 
     class Particle {
       x: number;
@@ -36,9 +36,9 @@ export const AnimatedBackground: React.FC = () => {
       constructor() {
         this.x = Math.random() * canvas!.width;
         this.y = Math.random() * canvas!.height;
-        this.dx = (Math.random() - 0.5) * 1.2;
-        this.dy = (Math.random() - 0.5) * 1.2;
-        this.size = Math.random() * 2 + 1;
+        this.dx = (Math.random() - 0.5) * 1.5;
+        this.dy = (Math.random() - 0.5) * 1.5;
+        this.size = Math.random() * 2.5 + 1.5; // slightly larger particles
         this.color = colors[Math.floor(Math.random() * colors.length)];
       }
 
@@ -75,9 +75,9 @@ export const AnimatedBackground: React.FC = () => {
 
           if (distance < connectionDistance) {
             ctx.beginPath();
-            // White tinted connections
-            ctx.strokeStyle = `rgba(255, 255, 255, ${0.4 * (1 - distance / connectionDistance)})`;
-            ctx.lineWidth = 1.2;
+            // Stronger white tinted connections
+            ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * (1 - distance / connectionDistance)})`;
+            ctx.lineWidth = 1.8; // thicker lines
             ctx.moveTo(particles[i].x, particles[i].y);
             ctx.lineTo(particles[j].x, particles[j].y);
             ctx.stroke();
