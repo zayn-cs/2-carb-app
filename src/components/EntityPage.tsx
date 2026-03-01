@@ -8,9 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Search, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, AlertTriangle, Printer } from "lucide-react";
 import { useLoading } from "@/context/LoadingContext";
 import { getAll, insert, updateRecord, removeRecord, getHistorique } from "@/lib/db";
+import html2pdf from 'html2pdf.js';
 
 interface EntityPageProps {
   config: EntityConfig;
@@ -149,6 +150,7 @@ export default function EntityPage({ config }: EntityPageProps) {
   };
 
   const formatValue = (value: any, type: string) => {
+    if (value === null || value === undefined) return "-";
     if (type === "boolean") {
       return value ? "Oui" : "Non";
     }
@@ -157,6 +159,58 @@ export default function EntityPage({ config }: EntityPageProps) {
       return date.toLocaleString("fr-FR");
     }
     return value;
+  };
+
+  const handlePrintPDF = (itemsToPrint: any[], title: string) => {
+    const opt = {
+      margin: 10,
+      filename: `${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    const element = document.createElement('div');
+    element.style.padding = '20px';
+
+    const itemsHtml = itemsToPrint.map((item, index) => `
+      <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; page-break-inside: avoid;">
+        <h3 style="margin-top: 0; color: #333; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 12px;">Élément ${index + 1}</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          <tbody>
+            ${config.fields.map(field => `
+              <tr>
+                <td style="padding: 6px 0; border-bottom: 1px solid #f9f9f9; width: 40%; font-weight: bold; color: #555;">${field.label}</td>
+                <td style="padding: 6px 0; border-bottom: 1px solid #f9f9f9; text-align: left;">${formatValue(item[field.name], field.type)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `).join('');
+
+    element.innerHTML = `
+      <div style="text-align: center; margin-bottom: 30px; padding-bottom: 10px; border-bottom: 2px solid #007bff;">
+        <h1 style="color: #007bff; margin: 0; font-size: 24px;">${title}</h1>
+        <div style="color: #666; font-size: 14px; margin-top: 5px;">
+          Généré le: ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}<br>
+          Nombre d'enregistrements: ${itemsToPrint.length}
+        </div>
+      </div>
+      
+      <div>
+        ${itemsHtml}
+      </div>
+      
+      <div style="text-align: center; margin-top: 30px; padding-top: 10px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
+        Ce document est généré automatiquement
+      </div>
+    `;
+
+    document.body.appendChild(element);
+    html2pdf().set(opt).from(element).save().then(() => {
+      document.body.removeChild(element);
+    });
   };
 
   if (isLoading) {
@@ -197,8 +251,8 @@ export default function EntityPage({ config }: EntityPageProps) {
         </div>
       )}
 
-      {config.key === "historique" && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+      <div className={`mb-4 flex flex-wrap items-center gap-4 ${config.key === "historique" ? "justify-between" : "justify-end"}`}>
+        {config.key === "historique" && (
           <div className="flex items-center gap-2">
             <Switch
               id="showAlertsOnly"
@@ -210,102 +264,113 @@ export default function EntityPage({ config }: EntityPageProps) {
               Afficher uniquement les alertes
             </Label>
           </div>
-          <div className="flex items-center gap-2">
+        )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const visibleIds = filteredItems.map(i => i.id);
+              const allSelected = visibleIds.length > 0 && selectedIds.length === visibleIds.length;
+              if (allSelected) {
+                setSelectedIds([]);
+              } else {
+                setSelectedIds(visibleIds);
+              }
+            }}
+          >
+            {(filteredItems.length > 0 && selectedIds.length === filteredItems.length) ? "Désélectionner tout" : "Tout sélectionner"}
+          </Button>
+          {selectedIds.length > 0 && (
             <Button
-              variant="outline"
+              variant="destructive"
               size="sm"
-              onClick={() => {
-                const visibleIds = filteredItems.map(i => i.id);
-                const allSelected = visibleIds.length > 0 && selectedIds.length === visibleIds.length;
-                if (allSelected) {
+              onClick={async () => {
+                if (!confirm(`Etes-vous sur de vouloir supprimer ${selectedIds.length} element(s)?`)) return;
+                showLoading(1000);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                try {
+                  selectedIds.forEach(id => removeRecord(config.table, id));
+                  toast({ title: "Succès", description: "Éléments supprimés avec succès" });
                   setSelectedIds([]);
-                } else {
-                  setSelectedIds(visibleIds);
+                  fetchItems();
+                } catch (error: any) {
+                  toast({ title: "Erreur", description: error.message, variant: "destructive" });
                 }
               }}
             >
-              {(filteredItems.length > 0 && selectedIds.length === filteredItems.length) ? "Désélectionner tout" : "Tout sélectionner"}
+              <Trash2 className="h-4 w-4 mr-2" />
+              Supprimer ({selectedIds.length})
             </Button>
-            {selectedIds.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={async () => {
-                  if (!confirm(`Etes-vous sur de vouloir supprimer ${selectedIds.length} element(s)?`)) return;
-                  showLoading(1000);
-                  await new Promise(resolve => setTimeout(resolve, 1000));
-                  try {
-                    selectedIds.forEach(id => removeRecord(config.table, id));
-                    toast({ title: "Succès", description: "Éléments supprimés avec succès" });
-                    setSelectedIds([]);
-                    fetchItems();
-                  } catch (error: any) {
-                    toast({ title: "Erreur", description: error.message, variant: "destructive" });
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer ({selectedIds.length})
-              </Button>
-            )}
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
       <Card>
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle>Liste des {config.label}s</CardTitle>
-            {config.key !== "historique" && (
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={openCreate}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Ajouter
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle>
-                      {editingId ? `Modifier ${config.label}` : `Ajouter ${config.label}`}
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    {config.fields.map(field => (
-                      <div key={field.name} className="grid grid-cols-3 items-center gap-4">
-                        <Label htmlFor={field.name} className="text-right">{field.label}</Label>
-                        {field.type === "boolean" ? (
-                          <Switch
-                            id={field.name}
-                            checked={!!formData[field.name]}
-                            onCheckedChange={(checked) => handleChange(field.name, checked)}
-                          />
-                        ) : (
-                          <Input
-                            id={field.name}
-                            type={field.type === "number" ? "number" : "text"}
-                            value={formData[field.name] || ""}
-                            onChange={(e) => handleChange(field.name, field.type === "number" ? Number(e.target.value) : e.target.value)}
-                            className="col-span-2"
-                            required={field.required}
-                          />
-                        )}
-                      </div>
-                    ))}
-                    <Button onClick={handleSave} className="mt-4">
-                      Sauvegarder
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => {
+                const itemsToPrint = selectedIds.length > 0
+                  ? filteredItems.filter(i => selectedIds.includes(i.id))
+                  : filteredItems;
+                handlePrintPDF(itemsToPrint, `Liste des ${config.label}s`);
+              }}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimer PDF
+              </Button>
+              {config.key !== "historique" && (
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={openCreate}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Ajouter
                     </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            )}
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingId ? `Modifier ${config.label}` : `Ajouter ${config.label}`}
+                      </DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      {config.fields.map(field => (
+                        <div key={field.name} className="grid grid-cols-3 items-center gap-4">
+                          <Label htmlFor={field.name} className="text-right">{field.label}</Label>
+                          {field.type === "boolean" ? (
+                            <Switch
+                              id={field.name}
+                              checked={!!formData[field.name]}
+                              onCheckedChange={(checked) => handleChange(field.name, checked)}
+                            />
+                          ) : (
+                            <Input
+                              id={field.name}
+                              type={field.type === "number" ? "number" : "text"}
+                              value={formData[field.name] || ""}
+                              onChange={(e) => handleChange(field.name, field.type === "number" ? Number(e.target.value) : e.target.value)}
+                              className="col-span-2"
+                              required={field.required}
+                            />
+                          )}
+                        </div>
+                      ))}
+                      <Button onClick={handleSave} className="mt-4">
+                        Sauvegarder
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                {config.key === "historique" && <TableHead className="p-1 w-12 text-center"></TableHead>}
+                <TableHead className="p-1 w-12 text-center"></TableHead>
                 {config.fields.map(field => (
                   <TableHead key={field.name} className="p-1">
                     <Input
@@ -319,7 +384,7 @@ export default function EntityPage({ config }: EntityPageProps) {
                 <TableHead className="p-1"></TableHead>
               </TableRow>
               <TableRow>
-                {config.key === "historique" && <TableHead className="w-12 text-center border-r">Sel.</TableHead>}
+                <TableHead className="w-12 text-center border-r">Sel.</TableHead>
                 {config.fields.map(field => (
                   <TableHead key={field.name} className="text-right">{field.label}</TableHead>
                 ))}
@@ -329,7 +394,7 @@ export default function EntityPage({ config }: EntityPageProps) {
             <TableBody>
               {filteredItems.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={config.fields.length + (config.key === "historique" ? 2 : 1)} className="text-center py-8">
+                  <TableCell colSpan={config.fields.length + 2} className="text-center py-8">
                     <p className="text-muted-foreground">
                       Aucun element trouve
                     </p>
@@ -340,22 +405,20 @@ export default function EntityPage({ config }: EntityPageProps) {
                   const isAlert = item.is_alert === 1 || item.is_alert === true;
                   return (
                     <TableRow key={item.id} className={isAlert ? "bg-orange-50" : ""}>
-                      {config.key === "historique" && (
-                        <TableCell className="text-center border-r">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 rounded border-border text-primary cursor-pointer"
-                            checked={selectedIds.includes(item.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedIds(prev => [...prev, item.id]);
-                              } else {
-                                setSelectedIds(prev => prev.filter(id => id !== item.id));
-                              }
-                            }}
-                          />
-                        </TableCell>
-                      )}
+                      <TableCell className="text-center border-r">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-border text-primary cursor-pointer"
+                          checked={selectedIds.includes(item.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedIds(prev => [...prev, item.id]);
+                            } else {
+                              setSelectedIds(prev => prev.filter(id => id !== item.id));
+                            }
+                          }}
+                        />
+                      </TableCell>
                       {config.fields.map(field => (
                         <TableCell key={field.name} className={`text-right ${isAlert ? "text-orange-700 font-medium" : ""}`}>
                           {field.name === "is_alert" && isAlert ? (
@@ -369,6 +432,9 @@ export default function EntityPage({ config }: EntityPageProps) {
                         </TableCell>
                       ))}
                       <TableCell className="text-right space-x-1 whitespace-nowrap">
+                        <Button variant="ghost" size="icon" onClick={() => handlePrintPDF([item], `Détails ${config.label}`)}>
+                          <Printer className="h-4 w-4 text-blue-500" />
+                        </Button>
                         {config.key !== "historique" && (
                           <Button variant="ghost" size="icon" onClick={() => openEdit(item)}>
                             <Pencil className="h-4 w-4" />
