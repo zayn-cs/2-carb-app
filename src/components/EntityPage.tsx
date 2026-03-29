@@ -25,6 +25,7 @@ export default function EntityPage({ config }: EntityPageProps) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [columnSearches, setColumnSearches] = useState<Record<string, string>>({});
+  const [globalSearch, setGlobalSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [showAlertsOnly, setShowAlertsOnly] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -71,6 +72,14 @@ export default function EntityPage({ config }: EntityPageProps) {
       filtered = filtered.filter(item => item.is_alert === 1 || item.is_alert === true);
     }
 
+    if (globalSearch) {
+      filtered = filtered.filter(item =>
+        config.fields.some(field =>
+          String(item[field.name] || "").toLowerCase().includes(globalSearch)
+        )
+      );
+    }
+
     config.fields.forEach(field => {
       const searchValue = columnSearches[field.name]?.toLowerCase().trim();
       if (searchValue) {
@@ -82,7 +91,7 @@ export default function EntityPage({ config }: EntityPageProps) {
     });
 
     setFilteredItems(filtered);
-  }, [columnSearches, items, showAlertsOnly]);
+  }, [columnSearches, globalSearch, items, showAlertsOnly]);
 
   const handleColumnSearch = (fieldName: string, value: string) => {
     setColumnSearches(prev => ({
@@ -164,10 +173,10 @@ export default function EntityPage({ config }: EntityPageProps) {
   const handlePrintPDF = (itemsToPrint: any[], title: string) => {
     const opt = {
       margin: 10,
-      filename: `${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
+      filename: `${title.replace(/\\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm' as const, format: 'a4', orientation: 'portrait' as const }
     };
 
     const element = document.createElement('div');
@@ -237,15 +246,8 @@ export default function EntityPage({ config }: EntityPageProps) {
             <Input
               placeholder="Rechercher..."
               className="pl-10"
-              onChange={(e) => {
-                const searchValue = e.target.value.toLowerCase();
-                const filtered = items.filter(item =>
-                  config.fields.some(field =>
-                    String(item[field.name] || "").toLowerCase().includes(searchValue)
-                  )
-                );
-                setFilteredItems(filtered);
-              }}
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value.toLowerCase())}
             />
           </div>
         </div>
@@ -335,7 +337,9 @@ export default function EntityPage({ config }: EntityPageProps) {
                       </DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
-                      {config.fields.map(field => (
+                      {config.fields.map(field => {
+                        if (field.isPrimaryKey) return null; // Don't show primary keys in the form as they are auto-generated
+                        return (
                         <div key={field.name} className="grid grid-cols-3 items-center gap-4">
                           <Label htmlFor={field.name} className="text-right">{field.label}</Label>
                           {field.type === "boolean" ? (
@@ -355,7 +359,7 @@ export default function EntityPage({ config }: EntityPageProps) {
                             />
                           )}
                         </div>
-                      ))}
+                      )})}
                       <Button onClick={handleSave} className="mt-4">
                         Sauvegarder
                       </Button>

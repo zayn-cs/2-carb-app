@@ -8,36 +8,23 @@ export function initializeDatabase(): void {
   const db = getDb();
   
   // Create tables if they don't exist
-  if (!db.profiles) {
-    db.profiles = [];
-  }
-  if (!db.historique) {
-    db.historique = [];
-  }
-  if (!db.echantillon) {
-    db.echantillon = [];
-  }
-  if (!db.laboratoire) {
-    db.laboratoire = [];
-  }
-  if (!db.laboriste) {
-    db.laboriste = [];
-  }
-  if (!db.processus_analyse) {
-    db.processus_analyse = [];
-  }
-  if (!db.resultat) {
-    db.resultat = [];
-  }
-  if (!db.norme) {
-    db.norme = [];
-  }
-  if (!db.organisme) {
-    db.organisme = [];
-  }
-  if (!db.diplome) {
-    db.diplome = [];
-  }
+  if (!db.profiles) { db.profiles = []; }
+  if (!db.historique) { db.historique = []; }
+  if (!db.user) { db.user = []; }
+  if (!db.organisme) { db.organisme = []; }
+  if (!db.laboratoire) { db.laboratoire = []; }
+  if (!db.echantillon) { db.echantillon = []; }
+  if (!db.laboriste) { db.laboriste = []; }
+  if (!db.diplome) { db.diplome = []; }
+  if (!db.obtenir) { db.obtenir = []; }
+  if (!db.emploie) { db.emploie = []; }
+  if (!db.processus_analyse) { db.processus_analyse = []; }
+  if (!db.equipement) { db.equipement = []; }
+  if (!db.effectuer) { db.effectuer = []; }
+  if (!db.etalonnage) { db.etalonnage = []; }
+  if (!db.effectuer_etalonnage) { db.effectuer_etalonnage = []; }
+  if (!db.norme) { db.norme = []; }
+  if (!db.resultat) { db.resultat = []; }
   
   saveDatabase(db);
   console.log("Database initialized successfully");
