@@ -1,4 +1,4 @@
-// Simple localStorage-based database for DCC Center
+// Simple localStorage-based database for DCC Labo
 // No external dependencies needed
 
 const DB_KEY = "dcc_db";
@@ -8,23 +8,16 @@ export function initializeDatabase(): void {
   const db = getDb();
   
   // Create tables if they don't exist
-  if (!db.profiles) { db.profiles = []; }
-  if (!db.historique) { db.historique = []; }
-  if (!db.user) { db.user = []; }
-  if (!db.organisme) { db.organisme = []; }
-  if (!db.laboratoire) { db.laboratoire = []; }
-  if (!db.echantillon) { db.echantillon = []; }
-  if (!db.laboriste) { db.laboriste = []; }
-  if (!db.diplome) { db.diplome = []; }
-  if (!db.obtenir) { db.obtenir = []; }
-  if (!db.emploie) { db.emploie = []; }
-  if (!db.processus_analyse) { db.processus_analyse = []; }
-  if (!db.equipement) { db.equipement = []; }
-  if (!db.effectuer) { db.effectuer = []; }
-  if (!db.etalonnage) { db.etalonnage = []; }
-  if (!db.effectuer_etalonnage) { db.effectuer_etalonnage = []; }
-  if (!db.norme) { db.norme = []; }
-  if (!db.resultat) { db.resultat = []; }
+  const tables = [
+    "profiles", "historique", "utilisateur", "organisme", "laboratoire", 
+    "echantillon", "laboriste", "diplome", "obtenir", 
+    "processus_analyse", "equipement", "effectuer_analyse", 
+    "etalonnage", "effectuer_etalonnage", "norme", "resultat", "comparer_norme"
+  ];
+
+  tables.forEach(table => {
+    if (!db[table]) db[table] = [];
+  });
   
   saveDatabase(db);
   console.log("Database initialized successfully");
@@ -32,20 +25,17 @@ export function initializeDatabase(): void {
 
 // Get database from localStorage
 export function getDb(): any {
+  if (typeof window === "undefined") return {};
   const stored = localStorage.getItem(DB_KEY);
   if (stored) {
-    const db = JSON.parse(stored);
-    console.log("Database loaded, keys:", Object.keys(db));
-    return db;
+    return JSON.parse(stored);
   }
-  console.log("No database found, creating new one");
   return {};
 }
 
 // Save database to localStorage
 export function saveDatabase(db: any): void {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
-  console.log("Database saved, historique count:", (db.historique || []).length);
 }
 
 // Profile functions
@@ -54,39 +44,18 @@ export function getProfile(id: string): any {
   return db.profiles?.find((p: any) => p.id === id) || null;
 }
 
-export function createProfile(id: string, nom: string, ipAddress?: string): void {
+export function upsertProfile(id: string, nom: string, ipAddress?: string): void {
   const db = getDb();
   db.profiles = db.profiles || [];
-  db.profiles.push({
-    id,
-    nom,
-    ip_address: ipAddress || null,
-    created_at: new Date().toISOString()
-  });
-  saveDatabase(db);
-}
-
-export function updateProfileIpAddress(id: string, ipAddress: string): void {
-  const db = getDb();
-  const profile = db.profiles?.find((p: any) => p.id === id);
-  if (profile) {
-    profile.ip_address = ipAddress;
-    saveDatabase(db);
-  }
-}
-
-export function upsertProfile(id: string, nom: string, ipAddress?: string): void {
-  const existing = getProfile(id);
-  if (existing) {
-    const db = getDb();
-    const idx = db.profiles.findIndex((p: any) => p.id === id);
-    if (idx !== -1) {
-      db.profiles[idx] = { ...db.profiles[idx], nom, ip_address: ipAddress || null };
-      saveDatabase(db);
-    }
+  const idx = db.profiles.findIndex((p: any) => p.id === id);
+  const data = { id, nom, ip_address: ipAddress || null, updated_at: new Date().toISOString() };
+  
+  if (idx !== -1) {
+    db.profiles[idx] = { ...db.profiles[idx], ...data };
   } else {
-    createProfile(id, nom, ipAddress);
+    db.profiles.push(data);
   }
+  saveDatabase(db);
 }
 
 // Historique functions
@@ -95,7 +64,7 @@ export function addHistoriqueEntry(
   action: string,
   dateAction: string,
   adresseIp: string,
-  email: string,
+  nomConnexion: string,
   succes: boolean,
   message: string,
   isAlert: boolean = false
@@ -103,34 +72,21 @@ export function addHistoriqueEntry(
   const db = getDb();
   db.historique = db.historique || [];
   db.historique.push({
-    id: Date.now(),
+    id_historique: Date.now(),
     user_id: userId,
     action,
     date_action: dateAction,
     adresse_ip: adresseIp,
-    email,
-    succes: succes ? 1 : 0,
+    nom_connexion: nomConnexion,
     message,
     is_alert: isAlert ? 1 : 0
   });
-  console.log("Added historique entry, total entries:", db.historique.length);
   saveDatabase(db);
 }
 
 export function getHistorique(): any[] {
   const db = getDb();
-  const historique = db.historique || [];
-  console.log("Getting historique, found entries:", historique.length);
-  
-  // Sort by date_action descending (newest first)
-  return historique.sort((a: any, b: any) => 
-    new Date(b.date_action).getTime() - new Date(a.date_action).getTime()
-  );
-}
-
-export function getHistoriqueByUser(userId: string): any[] {
-  const db = getDb();
-  return (db.historique || []).filter((h: any) => h.user_id === userId).sort((a: any, b: any) => 
+  return (db.historique || []).sort((a: any, b: any) => 
     new Date(b.date_action).getTime() - new Date(a.date_action).getTime()
   );
 }
@@ -141,38 +97,35 @@ export function getAll(table: string): any[] {
   return db[table] || [];
 }
 
-export function getById(table: string, id: number): any {
-  const db = getDb();
-  return db[table]?.find((item: any) => item.id === id) || null;
-}
-
-export function insert(table: string, data: Record<string, any>): void {
+export function insert(table: string, data: Record<string, any>, pkField: string = "id"): void {
   const db = getDb();
   db[table] = db[table] || [];
   
-  // Get max id
-  const maxId = db[table].reduce((max: number, item: any) => Math.max(max, item.id || 0), 0);
+  // Auto-increment logic
+  const maxId = db[table].reduce((max: number, item: any) => Math.max(max, parseInt(item[pkField]) || 0), 0);
   
-  db[table].push({
+  const newRecord = {
     ...data,
-    id: maxId + 1,
+    [pkField]: maxId + 1,
     created_at: new Date().toISOString()
-  });
+  };
+  
+  db[table].push(newRecord);
   saveDatabase(db);
 }
 
-export function updateRecord(table: string, id: number, data: Record<string, any>): void {
+export function updateRecord(table: string, pkField: string, pkValue: any, data: Record<string, any>): void {
   const db = getDb();
-  const idx = db[table]?.findIndex((item: any) => item.id === id);
+  const idx = db[table]?.findIndex((item: any) => String(item[pkField]) === String(pkValue));
   if (idx !== -1 && idx !== undefined) {
     db[table][idx] = { ...db[table][idx], ...data };
     saveDatabase(db);
   }
 }
 
-export function removeRecord(table: string, id: number): void {
+export function removeRecord(table: string, pkField: string, pkValue: any): void {
   const db = getDb();
-  db[table] = (db[table] || []).filter((item: any) => item.id !== id);
+  db[table] = (db[table] || []).filter((item: any) => String(item[pkField]) !== String(pkValue));
   saveDatabase(db);
 }
 

@@ -33,7 +33,7 @@ export const LoadingLogo: React.FC<LoadingLogoProps> = ({ size = 'md' }) => {
         <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-ping" />
         {/* Static inner ring */}
         <div className="absolute inset-0 rounded-full border-2 border-primary/60" />
-        {/* DCC Center logo */}
+        {/* DCC Labo logo */}
         <div className="absolute inset-0 flex items-center justify-center">
           <img 
             src="https://www.mdn.dz/site_principal/sommaire/presentation/images/insignes/dcc.png" 

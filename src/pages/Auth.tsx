@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "@/hooks/use-toast";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
 import { LoadingLogo } from "@/components/LoadingLogo";
-import { initializeDatabase, addHistoriqueEntry, upsertProfile } from "@/lib/db";
+import { initializeDatabase, addHistoriqueEntry, upsertProfile, getDb, saveDatabase } from "@/lib/db";
 import { useAuth } from "@/hooks/useAuth";
 
 interface User {
@@ -21,8 +21,7 @@ interface User {
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
-  const [nom, setNom] = useState("");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [ipAddress, setIpAddress] = useState("");
@@ -31,6 +30,7 @@ export default function Auth() {
   const { signIn } = useAuth();
 
   // Initialize database on mount
+  // Initialize database on mount and fetch IP automatically
   useEffect(() => {
     try {
       initializeDatabase();
@@ -38,40 +38,37 @@ export default function Auth() {
     } catch (e) {
       console.error("DB init error:", e);
     }
+
+    // Fetch IP automatically without showing it to the user
+    fetch('https://api.ipify.org?format=json')
+      .then(res => res.json())
+      .then(data => {
+        if (data.ip) {
+          setIpAddress(data.ip);
+        }
+      })
+      .catch(err => console.error("Could not fetch IP automatically:", err));
   }, []);
 
-  // Get users from localStorage
-  const getUsers = (): User[] => {
-    const users = localStorage.getItem("dcc_users");
-    return users ? JSON.parse(users) : [];
-  };
-
-  // Get user by IP address
-  const getUserByIp = (ip: string): User | undefined => {
-    const users = getUsers();
-    return users.find(u => u.ipAddress === ip);
-  };
-
-  // Save users to localStorage
-  const saveUsers = (users: User[]) => {
-    localStorage.setItem("dcc_users", JSON.stringify(users));
+  // Get users from the unified database
+  const getUnifiedUsers = (): any[] => {
+    const db = getDb();
+    return db.utilisateur || [];
   };
 
   // Log historique entry
-  const logHistorique = (action: string, email: string, success: boolean, message: string, isAlert: boolean = false, userId?: string) => {
+  const logHistorique = (action: string, username_val: string, success: boolean, message: string, isAlert: boolean = false, userId?: any) => {
     try {
-      console.log("Logging to historique:", { action, email, success, message, ipAddress, userId });
       addHistoriqueEntry(
         userId || null,
         action,
         new Date().toISOString(),
         ipAddress,
-        email,
+        username_val,
         success,
         message,
         isAlert
       );
-      console.log("Historique logged successfully");
     } catch (error) {
       console.error("Error logging historique:", error);
     }
@@ -82,60 +79,32 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      // Simulate loading
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const users = getUsers();
-      const user = users.find(u => u.email === email && u.password === password);
-      const userByEmail = users.find(u => u.email === email);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const users = getUnifiedUsers();
+      const user = users.find(u => u.nom_user === username && u.password === password);
 
       if (!user) {
-        // Log failed login attempt to historique
-        logHistorique("Tentative de connexion", email, false, `Tentative de connexion échouée - Email ou mot de passe incorrect - IP: ${ipAddress}`, false, userByEmail?.id);
-        toast({ title: "Erreur", description: "Email ou mot de passe incorrect", variant: "destructive" });
+        logHistorique("Tentative de connexion", username, false, "Identifiants incorrects", false);
+        toast({ title: "Erreur", description: "Nom d'utilisateur ou mot de passe incorrect", variant: "destructive" });
         setLoading(false);
         return;
       }
 
-      // Check if user has an IP address assigned
-      if (user.ipAddress && user.ipAddress !== ipAddress) {
-        // Log IP mismatch to historique
-        logHistorique("Tentative de connexion", email, false, `Connexion refusée - IP non autorisé (Enregistré: ${user.ipAddress}, Actuel: ${ipAddress})`, true, user.id);
-        toast({ title: "Erreur", description: "Cette adresse IP n'est pas autorisée pour ce compte", variant: "destructive" });
+      if (user.ip_address && user.ip_address !== ipAddress) {
+        logHistorique("Alerte Sécurité", username, false, `IP non autorisé: ${ipAddress}`, true, user.id_user);
+        toast({ title: "Accès Refusé", description: "Cette adresse IP n'est pas autorisée", variant: "destructive" });
         setLoading(false);
         return;
       }
 
-      // If user has no IP assigned, assign current IP
-      if (!user.ipAddress) {
-        user.ipAddress = ipAddress;
-        saveUsers(users);
-      }
-
-      // Log successful login to historique
-      logHistorique("Connexion", email, true, `Connexion réussie - IP: ${ipAddress}`, false, user.id);
-
-      // Store current user in session (without password)
-      const sessionUser = { id: user.id, email: user.email, nom: user.nom };
+      logHistorique("Connexion", username, true, "Connecté", false, user.id_user);
+      const sessionUser = { id: user.id_user, nom: user.nom_user, ipAddress: user.ip_address };
       sessionStorage.setItem("currentUser", JSON.stringify(sessionUser));
-
-      // Update auth context
       signIn(sessionUser);
-
-      // Small delay to ensure session is saved
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      toast({
-        title: "✓ Connexion réussie",
-        description: "Bienvenue dans votre compte!",
-        variant: "success"
-      });
-
-      // Navigate to dashboard
+      
+      toast({ title: "✓ Bienvenue", description: `Ravi de vous revoir, ${user.nom_user}` });
       navigate("/dashboard");
     } catch (error: any) {
-      console.error("Login error:", error);
-      logHistorique("Login", email, false, error.message);
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     }
     setLoading(false);
@@ -145,61 +114,34 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
 
-    // Show loading for at least 1 second
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     try {
-      const users = getUsers();
+      const db = getDb();
+      const users = db.utilisateur || [];
 
-      // Check if IP already has a user assigned
-      const existingUserByIp = getUserByIp(ipAddress);
-      if (existingUserByIp) {
-        toast({ title: "Erreur", description: "Cette adresse IP est déjà utilisée par un autre compte", variant: "destructive" });
-        logHistorique("Inscription Échouée", email, false, `Inscription refusée - IP déjà utilisée: ${ipAddress}`);
+      if (users.find((u: any) => u.nom_user === username)) {
+        toast({ title: "Erreur", description: "Ce nom d'utilisateur existe déjà", variant: "destructive" });
         setLoading(false);
         return;
       }
 
-      // Check if user already exists
-      if (users.find(u => u.email === email)) {
-        toast({ title: "Erreur", description: "Cet email est déjà utilisé", variant: "destructive" });
-        setLoading(false);
-        return;
-      }
-
-      // Create new user with IP address
-      const newUser: User = {
-        id: "user_" + Date.now(),
-        email,
-        password,
-        nom,
-        ipAddress: ipAddress
+      const newUser = {
+        id_user: Date.now(),
+        nom_user: username,
+        password: password,
+        ip_address: ipAddress
       };
 
-      users.push(newUser);
-      saveUsers(users);
+      db.utilisateur.push(newUser);
+      saveDatabase(db);
+      upsertProfile(String(newUser.id_user), username, ipAddress);
+      
+      logHistorique("Inscription", username, true, "Nouveau compte créé", false, newUser.id_user);
 
-      // Log successful registration to historique
-      logHistorique("Inscription Réussie", email, true, `Nouveau utilisateur enregistré - IP: ${ipAddress}`, false, newUser.id);
-
-      // Store user's IP address in profiles table
-      try {
-        upsertProfile(newUser.id, nom, ipAddress);
-      } catch (err) {
-        console.error("Error updating profile:", err);
-      }
-
-      // Log successful registration
-      logHistorique("Register", email, true, "Inscription réussie", false, newUser.id);
-
-      toast({
-        title: "✓ Inscription réussie",
-        description: "Votre compte a été créé avec succès!",
-        variant: "success"
-      });
+      toast({ title: "✓ Succès", description: "Compte créé ! Vous pouvez vous connecter." });
       setIsLogin(true);
     } catch (error: any) {
-      logHistorique("Register", email, false, error.message);
       toast({ title: "Erreur", description: error.message, variant: "destructive" });
     }
     setLoading(false);
@@ -210,11 +152,14 @@ export default function Auth() {
       <AnimatedBackground />
       {/* Arabic text at the top center */}
       <div className="fixed top-8 left-0 right-0 text-center z-10">
-        <div className="text-2xl font-bold text-primary mb-2" dir="rtl">
-          الجمهورية الجزائرية الديمقراطية الشعبية
+        <div className="text-2xl font-bold text-primary mb-2">
+          République Algérienne Démocratique et Populaire
         </div>
-        <div className="text-lg font-medium text-muted-foreground" dir="rtl">
-          وزارة الدفاع الوطني
+        <div className="text-lg font-medium text-muted-foreground mb-1">
+          Ministère de la Défense Nationale
+        </div>
+        <div className="text-md font-semibold text-primary/80 uppercase tracking-wider">
+          Direction Centrale des Carburants
         </div>
       </div>
       {/* Top corner decorative elements - DCC themed */}
@@ -256,35 +201,16 @@ export default function Auth() {
                 className="h-16 w-16 object-contain drop-shadow-md"
               />
             </div>
-            <CardTitle className="text-2xl font-bold">{isLogin ? "DCC CENTER" : "DCC CENTER"}</CardTitle>
+            <CardTitle className="text-3xl font-bold tracking-widest">LABO</CardTitle>
             <CardDescription>
               {isLogin ? "Connectez-vous à votre compte" : "Créez un nouveau compte"}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={isLogin ? handleLogin : handleRegister} className="space-y-4">
-              {/* IP Address Display */}
               <div className="space-y-2">
-                <Label htmlFor="ipAddress">Adresse IP</Label>
-                <Input
-                  id="ipAddress"
-                  type="text"
-                  value={ipAddress}
-                  onChange={(e) => setIpAddress(e.target.value)}
-                  placeholder="L'adresse IP (ex: 192.168.1.1)"
-                  required
-                />
-              </div>
-
-              {!isLogin && (
-                <div className="space-y-2">
-                  <Label htmlFor="nom">Nom d'utilisateur</Label>
-                  <Input id="nom" value={nom} onChange={(e) => setNom(e.target.value)} required placeholder="Votre nom" />
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="email@exemple.com" />
+                <Label htmlFor="username">Nom d'utilisateur</Label>
+                <Input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="Nom d'utilisateur" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Mot de passe</Label>
