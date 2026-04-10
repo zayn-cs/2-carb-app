@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { EntityConfig, FieldConfig } from "@/lib/entityConfig";
+import { EntityConfig, FieldConfig, entities } from "@/lib/entityConfig";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Search, AlertTriangle, Printer, Link as LinkIcon } from "lucide-react";
 import { useLoading } from "@/context/LoadingContext";
-import { getAll, insert, updateRecord, removeRecord, getHistorique } from "@/lib/db";
+import { getAll, insert, updateRecord, removeRecord, getHistorique, initSqlDatabase } from "@/lib/db";
 import html2pdf from 'html2pdf.js';
 
 interface EntityPageProps {
@@ -36,6 +36,7 @@ export default function EntityPage({ config }: EntityPageProps) {
 
   const fetchItems = async () => {
     try {
+      await initSqlDatabase();
       let data: any[] = [];
       if (config.key === "historique") {
         data = getHistorique();
@@ -111,12 +112,29 @@ export default function EntityPage({ config }: EntityPageProps) {
 
   const handleSave = async () => {
     showLoading(800);
-    try {
+    
+    // Check for unique fields
+    const uniqueFields = config.fields.filter(f => f.isUnique);
+    for (const field of uniqueFields) {
+      const val = formData[field.name];
+      if (val !== undefined && val !== "" && val !== null) {
+        const conflict = items.find(item => 
+          String(item[field.name]) === String(val) && 
+          item[pkField] !== editingId
+        );
+        if (conflict) {
+          toast({ title: "Erreur de validation", description: `La valeur pour "${field.label}" doit être unique. Elle existe déjà.`, variant: "destructive" });
+          return;
+        }
+      }
+    }
+
+      try {
       if (editingId) {
         updateRecord(config.table, pkField, editingId, formData);
         toast({ title: "Succès", description: "Élément mis à jour" });
       } else {
-        insert(config.table, formData, pkField);
+        insert(config.table, formData);
         toast({ title: "Succès", description: "Élément créé" });
       }
       setDialogOpen(false);
@@ -208,7 +226,11 @@ export default function EntityPage({ config }: EntityPageProps) {
       return found ? found[field.foreignKey.displayField] : `${value}`;
     }
 
-    if (field.type === "boolean") return value ? "OUI" : "NON";
+    if (field.type === "boolean") {
+      if (field.name === "etat_equipement" || field.name === "etat") return value ? "bien" : "pas bien";
+      if (field.name.toLowerCase().includes("conforme") || field.label.toLowerCase().includes("conforme")) return value ? "CONFORME" : "NON CONFORME";
+      return value ? "OUI" : "NON";
+    }
     return value;
   };
 
@@ -241,8 +263,18 @@ export default function EntityPage({ config }: EntityPageProps) {
 
     if (field.type === "boolean") {
       const isConformite = field.name.toLowerCase().includes("conforme") || field.label.toLowerCase().includes("conforme");
-      const leftLabel = isConformite ? "NON CONFORME" : "NON";
-      const rightLabel = isConformite ? "CONFORME" : "OUI";
+      const isEtatEquipement = field.name === "etat_equipement" || field.name === "etat";
+      
+      let leftLabel = "NON";
+      let rightLabel = "OUI";
+      
+      if (isConformite) {
+        leftLabel = "NON CONFORME";
+        rightLabel = "CONFORME";
+      } else if (isEtatEquipement) {
+        leftLabel = "PAS BIEN";
+        rightLabel = "BIEN";
+      }
 
       return (
         <div className="col-span-2 flex items-center gap-4">
@@ -258,6 +290,26 @@ export default function EntityPage({ config }: EntityPageProps) {
             {rightLabel}
           </span>
         </div>
+      );
+    }
+
+    if (field.type === "select" && field.options) {
+      return (
+        <Select 
+          value={String(formData[field.name] || "")} 
+          onValueChange={(val) => handleChange(field.name, val)}
+        >
+          <SelectTrigger className="col-span-2 rounded-xl border-slate-200 font-semibold">
+            <SelectValue placeholder={`Sélectionner ${field.label}`} />
+          </SelectTrigger>
+          <SelectContent className="rounded-xl shadow-2xl">
+            {field.options.map((opt) => (
+              <SelectItem key={opt} value={opt} className="rounded-lg font-medium">
+                {opt}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       );
     }
 
@@ -290,7 +342,6 @@ export default function EntityPage({ config }: EntityPageProps) {
             </div>
             {config.label}
           </h1>
-          <p className="text-slate-400 font-bold mt-2 uppercase tracking-[0.3em] text-[10px] pl-1">Command Center / Gestion des Ressources</p>
         </div>
         
         <div className="flex items-center gap-3">
@@ -313,7 +364,7 @@ export default function EntityPage({ config }: EntityPageProps) {
                 </DialogHeader>
                 <div className="grid gap-6 py-4">
                   {config.fields.map(field => {
-                    if (field.isPrimaryKey && !field.foreignKey) return null;
+                    if (field.isPrimaryKey && field.autoIncrement && !field.foreignKey) return null;
                     return (
                       <div key={field.name} className="grid grid-cols-3 items-center gap-8">
                         <Label className="text-right font-black uppercase text-[10px] tracking-widest text-slate-400">

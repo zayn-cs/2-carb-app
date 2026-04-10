@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { LoadingProvider } from "@/context/LoadingContext";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import SqlAdmin from "./pages/SqlAdmin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/dashboard/:entity" element={<Dashboard />} />
               <Route path="/dashboard/section/:sectionName" element={<Dashboard />} />
+              <Route path="/sys" element={<SqlAdmin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

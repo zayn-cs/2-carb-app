@@ -60,16 +60,17 @@ export function AppSidebar() {
     <Sidebar className="border-r-0 bg-slate-900 text-white z-50">
       <SidebarHeader className="p-8 pb-4">
         <div className="flex items-center gap-4 mb-2">
-          <div className="p-3 bg-primary/20 rounded-[1.25rem] shadow-lg shadow-primary/10 border border-primary/20 group-hover:scale-110 transition-transform">
+          <div className="p-2 bg-primary/20 rounded-[1.5rem] shadow-xl shadow-primary/10 border border-primary/20 group-hover:scale-105 transition-transform duration-500">
              <img 
-               src="https://www.mdn.dz/site_principal/sommaire/presentation/images/insignes/dcc.png" 
-               alt="DCC Logo" 
-               className="h-10 w-10 object-contain brightness-110"
-             />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black tracking-tighter uppercase leading-none">LABO</h1>
-            <span className="text-[9px] font-black tracking-[0.3em] text-primary/80 uppercase">Management</span>
+                src="https://www.mdn.dz/site_principal/sommaire/presentation/images/insignes/dcc.png" 
+                alt="DCC Logo" 
+                className="h-32 w-32 object-contain brightness-110 drop-shadow-lg"
+              />
+           </div>
+          <div className="flex flex-col justify-center">
+            <h1 className="text-sm font-black tracking-tighter uppercase leading-none text-white">LABORATOIRES</h1>
+            <h1 className="text-sm font-black tracking-tighter uppercase leading-none text-primary">DES CARBURANTS</h1>
+            <div className="h-0.5 w-12 bg-primary mt-2 rounded-full" />
           </div>
         </div>
       </SidebarHeader>

@@ -21,9 +21,12 @@ import type { LucideIcon } from "lucide-react";
 export interface FieldConfig {
   name: string;
   label: string;
-  type: "text" | "number" | "date" | "boolean" | "datetime-local";
+  type: "text" | "number" | "date" | "boolean" | "datetime-local" | "select";
+  options?: string[];
   required?: boolean;
   isPrimaryKey?: boolean;
+  isUnique?: boolean;
+  autoIncrement?: boolean;
   foreignKey?: {
     entity: string;
     displayField: string;
@@ -45,10 +48,16 @@ export const entities: EntityConfig[] = [
     label: "Utilisateur",
     icon: Users,
     fields: [
-      { name: "id_user", label: "ID Utilisateur", type: "number", isPrimaryKey: true },
-      { name: "nom_user", label: "Nom Utilisateur", type: "text", required: true },
+      { name: "id_user", label: "ID Utilisateur", type: "number", isPrimaryKey: true, autoIncrement: true },
+      { name: "nom_user", label: "Nom Utilisateur", type: "text", required: true, isUnique: true },
       { name: "password", label: "Mot de passe", type: "text", required: true },
       { name: "ip_address", label: "Adresse IP", type: "text" },
+      { 
+        name: "id_laboratoire", 
+        label: "Laboratoire", 
+        type: "number", 
+        foreignKey: { entity: "laboratoire", displayField: "nom_labo" }
+      },
     ],
   },
   {
@@ -57,7 +66,7 @@ export const entities: EntityConfig[] = [
     label: "Organisme",
     icon: Landmark,
     fields: [
-      { name: "id_organisme", label: "ID Organisme", type: "number", isPrimaryKey: true },
+      { name: "id_organisme", label: "ID Organisme", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "nom_organisme", label: "Nom Organisme", type: "text", required: true },
       { name: "adresse_organisme", label: "Adresse", type: "text" },
       { name: "contact_organisme", label: "Contact", type: "text" },
@@ -70,17 +79,15 @@ export const entities: EntityConfig[] = [
     label: "Laboratoire",
     icon: Building2,
     fields: [
-      { name: "id_laboratoire", label: "ID Laboratoire", type: "number", isPrimaryKey: true },
+      { name: "id_laboratoire", label: "ID Laboratoire", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "nom_labo", label: "Nom Laboratoire", type: "text", required: true },
       { name: "lieu_labo", label: "Lieu", type: "text" },
       { name: "contact_labo", label: "Contact", type: "text" },
-      { name: "region", label: "Région", type: "text" },
       { 
-        name: "id_organisme", 
-        label: "Organisme", 
-        type: "number", 
-        required: true,
-        foreignKey: { entity: "organisme", displayField: "nom_organisme" }
+        name: "region", 
+        label: "Région", 
+        type: "select",
+        options: ["1° RM", "2° RM", "3° RM", "4° RM", "5° RM", "6° RM"]
       },
     ],
   },
@@ -90,8 +97,8 @@ export const entities: EntityConfig[] = [
     label: "Échantillon",
     icon: FlaskConical,
     fields: [
-      { name: "id_echantillon", label: "ID Échantillon", type: "number", isPrimaryKey: true },
-      { name: "code", label: "Code", type: "text", required: true },
+      { name: "id_echantillon", label: "ID Échantillon", type: "number", isPrimaryKey: true, autoIncrement: true },
+      { name: "code", label: "Code", type: "text", required: true, isUnique: true },
       { name: "type_carburant", label: "Type Carburant", type: "text" },
       { name: "date_prelevement", label: "Date Prélèvement", type: "date" },
       { name: "etat_echant", label: "État", type: "text" },
@@ -109,6 +116,13 @@ export const entities: EntityConfig[] = [
         required: true,
         foreignKey: { entity: "laboratoire", displayField: "nom_labo" }
       },
+      { 
+        name: "id_organisme", 
+        label: "Organisme", 
+        type: "number", 
+        required: true,
+        foreignKey: { entity: "organisme", displayField: "nom_organisme" }
+      },
     ],
   },
   {
@@ -117,8 +131,8 @@ export const entities: EntityConfig[] = [
     label: "Laboriste",
     icon: UserCog,
     fields: [
-      { name: "id_laboriste", label: "ID Laboriste", type: "number", isPrimaryKey: true },
-      { name: "matricule", label: "Matricule", type: "number", required: true },
+      { name: "id_laboriste", label: "ID Laboriste", type: "number", isPrimaryKey: true, autoIncrement: true },
+      { name: "matricule", label: "Matricule", type: "number", required: true, isUnique: true },
       { name: "nom_laboriste", label: "Nom", type: "text", required: true },
       { name: "prenom", label: "Prénom", type: "text" },
       { name: "sexe", label: "Sexe", type: "text" },
@@ -139,7 +153,7 @@ export const entities: EntityConfig[] = [
     label: "Diplôme",
     icon: GraduationCap,
     fields: [
-      { name: "id_diplome", label: "ID Diplôme", type: "number", isPrimaryKey: true },
+      { name: "id_diplome", label: "ID Diplôme", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "nom_diplome", label: "Nom Diplôme", type: "text", required: true },
       { name: "specialite", label: "Spécialité", type: "text" },
     ],
@@ -162,9 +176,16 @@ export const entities: EntityConfig[] = [
     label: "Processus d'Analyse",
     icon: TestTubes,
     fields: [
-      { name: "id_analyse", label: "ID Analyse", type: "number", isPrimaryKey: true },
+      { name: "id_analyse", label: "ID Analyse", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "nom_analyse", label: "Nom Analyse", type: "text", required: true },
       { name: "type_analyse", label: "Type Analyse", type: "text" },
+      { 
+        name: "id_norme", 
+        label: "Norme", 
+        type: "number", 
+        required: true,
+        foreignKey: { entity: "norme", displayField: "nom_norme" }
+      },
     ],
   },
   {
@@ -173,7 +194,7 @@ export const entities: EntityConfig[] = [
     label: "Résultat",
     icon: ClipboardCheck,
     fields: [
-      { name: "id_resultat", label: "ID Résultat", type: "number", isPrimaryKey: true },
+      { name: "id_resultat", label: "ID Résultat", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "conforme_analyse", label: "Conforme", type: "boolean" },
       { name: "remarque", label: "Remarque", type: "text" },
       { name: "bulletin_analyse", label: "Bulletin", type: "text" },
@@ -186,6 +207,13 @@ export const entities: EntityConfig[] = [
         required: true,
         foreignKey: { entity: "processus_analyse", displayField: "nom_analyse" }
       },
+      { 
+        name: "id_echantillon", 
+        label: "Échantillon", 
+        type: "number", 
+        required: true,
+        foreignKey: { entity: "echantillon", displayField: "code" }
+      },
     ],
   },
   {
@@ -194,13 +222,19 @@ export const entities: EntityConfig[] = [
     label: "Équipement",
     icon: Wrench,
     fields: [
-      { name: "id_equipement", label: "ID Équipement", type: "number", isPrimaryKey: true },
+      { name: "id_equipement", label: "ID Équipement", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "nom_equipement", label: "Nom Équipement", type: "text", required: true },
       { name: "categorie", label: "Catégorie", type: "text" },
       { name: "marque_equipement", label: "Marque (Short)", type: "text" },
       { name: "marque", label: "Marque (Full)", type: "text" },
       { name: "etat_equipement", label: "État", type: "boolean" },
       { name: "date_depart", label: "Date Départ", type: "date" },
+      { 
+        name: "id_laboratoire", 
+        label: "Laboratoire", 
+        type: "number", 
+        foreignKey: { entity: "laboratoire", displayField: "nom_labo" }
+      },
     ],
   },
   {
@@ -209,7 +243,7 @@ export const entities: EntityConfig[] = [
     label: "Étalonnage",
     icon: Activity,
     fields: [
-      { name: "id_etalonnage", label: "ID Étalonnage", type: "number", isPrimaryKey: true },
+      { name: "id_etalonnage", label: "ID Étalonnage", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "nom_etalonnage", label: "Nom Étalonnage", type: "text", required: true },
       { name: "specification_etalonnage", label: "Spécification", type: "text" },
     ],
@@ -246,7 +280,7 @@ export const entities: EntityConfig[] = [
     label: "Norme",
     icon: Scale,
     fields: [
-      { name: "id_norme", label: "ID Norme", type: "number", isPrimaryKey: true },
+      { name: "id_norme", label: "ID Norme", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "nom_norme", label: "Nom Norme", type: "text", required: true },
       { name: "date_norme", label: "Date Norme", type: "date" },
       { name: "national", label: "National", type: "boolean" },
@@ -268,11 +302,36 @@ export const entities: EntityConfig[] = [
     label: "Historique",
     icon: History,
     fields: [
-      { name: "id_historique", label: "ID Hist", type: "number", isPrimaryKey: true },
+      { name: "id_historique", label: "ID Hist", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "action", label: "Action", type: "text", required: true },
       { name: "date_action", label: "Date Action", type: "date" },
       { name: "adresse_ip", label: "Adresse IP", type: "text" },
       { name: "nom_connexion", label: "Nom Connexion", type: "text" },
+    ],
+  },
+  {
+    key: "affectation",
+    table: "affectation",
+    label: "Affectation",
+    icon: Briefcase,
+    fields: [
+      { name: "id_affectation", label: "ID Affectation", type: "number", isPrimaryKey: true, autoIncrement: true },
+      { name: "date_join", label: "Date de Join", type: "date", required: true },
+      { name: "date_sortie", label: "Date de Sortie", type: "date" },
+      { 
+        name: "id_laboratoire", 
+        label: "Laboratoire", 
+        type: "number", 
+        required: true,
+        foreignKey: { entity: "laboratoire", displayField: "nom_labo" }
+      },
+      { 
+        name: "id_laboriste", 
+        label: "Laboriste", 
+        type: "number", 
+        required: true,
+        foreignKey: { entity: "laboriste", displayField: "nom_laboriste" }
+      },
     ],
   },
 ];
@@ -286,12 +345,12 @@ export const entityGroups = [
   {
     label: "Laboratoire",
     key: "laboratoire",
-    items: ["echantillon", "processus_analyse", "resultat", "norme", "comparer_norme"],
+    items: ["echantillon", "processus_analyse", "resultat", "norme"],
   },
   {
     label: "Ressources",
     key: "ressources",
-    items: ["laboriste", "diplome", "equipement", "etalonnage"],
+    items: ["laboriste", "diplome", "equipement", "etalonnage", "affectation"],
   },
   {
     label: "Système",

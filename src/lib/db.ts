@@ -1,64 +1,107 @@
-// Simple localStorage-based database for DCC Labo
-// No external dependencies needed
+import { initialData } from "./initialData";
+import { entities } from "./entityConfig";
 
-const DB_KEY = "dcc_db";
+const DB_KEY = "dcc_app_db_v2";
 
-// Initialize database tables in localStorage
-export function initializeDatabase(): void {
-  const db = getDb();
-  
-  // Create tables if they don't exist
-  const tables = [
-    "profiles", "historique", "utilisateur", "organisme", "laboratoire", 
-    "echantillon", "laboriste", "diplome", "obtenir", 
-    "processus_analyse", "equipement", "effectuer_analyse", 
-    "etalonnage", "effectuer_etalonnage", "norme", "resultat", "comparer_norme"
-  ];
+// Initialize the database in memory
+let dbStore: Record<string, any[]> = {};
 
-  tables.forEach(table => {
-    if (!db[table]) db[table] = [];
-  });
-  
-  saveDatabase(db);
-  console.log("Database initialized successfully");
-}
-
-// Get database from localStorage
-export function getDb(): any {
-  if (typeof window === "undefined") return {};
-  const stored = localStorage.getItem(DB_KEY);
-  if (stored) {
-    return JSON.parse(stored);
-  }
-  return {};
-}
-
-// Save database to localStorage
-export function saveDatabase(db: any): void {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
-}
-
-// Profile functions
-export function getProfile(id: string): any {
-  const db = getDb();
-  return db.profiles?.find((p: any) => p.id === id) || null;
-}
-
-export function upsertProfile(id: string, nom: string, ipAddress?: string): void {
-  const db = getDb();
-  db.profiles = db.profiles || [];
-  const idx = db.profiles.findIndex((p: any) => p.id === id);
-  const data = { id, nom, ip_address: ipAddress || null, updated_at: new Date().toISOString() };
-  
-  if (idx !== -1) {
-    db.profiles[idx] = { ...db.profiles[idx], ...data };
+export async function initSqlDatabase(): Promise<void> {
+  const saved = localStorage.getItem(DB_KEY);
+  if (saved) {
+    try {
+      dbStore = JSON.parse(saved);
+      console.log("Database loaded from localStorage");
+    } catch (e) {
+      console.error("Failed to parse database, resetting", e);
+      dbStore = {};
+    }
   } else {
-    db.profiles.push(data);
+    dbStore = {};
   }
-  saveDatabase(db);
+
+  // Ensure all tables exist and are seeded if empty
+  Object.keys(initialData).forEach(table => {
+    if (!dbStore[table] || dbStore[table].length === 0) {
+      dbStore[table] = initialData[table];
+    } else if (table === "utilisateur") {
+      // Special case: sync users from initialData so code changes are reflected
+      initialData.utilisateur.forEach(u => {
+        const idx = dbStore[table].findIndex(exist => exist.id_user === u.id_user);
+        if (idx === -1) {
+          dbStore[table].push(u);
+        } else {
+          dbStore[table][idx] = { ...dbStore[table][idx], ...u };
+        }
+      });
+    }
+  });
+
+  // Ensure all entities defined in config exist in the store
+  entities.forEach(entity => {
+    if (!dbStore[entity.table]) {
+      dbStore[entity.table] = [];
+    }
+  });
+
+  saveDb();
+  console.log("Database initialized (JSON method)");
+  return Promise.resolve();
 }
 
-// Historique functions
+export function saveDb(): void {
+  localStorage.setItem(DB_KEY, JSON.stringify(dbStore));
+}
+
+export function getAll(table: string): any[] {
+  return dbStore[table] || [];
+}
+
+export function query(sql: string, params: any[] = []): any[] {
+  // Mock query for historical reasons, but we work with JSON
+  console.warn("SQL Query called in JSON mode, ignoring SQL and returning table data if possible");
+  const tableName = sql.match(/FROM\s+(\w+)/i)?.[1];
+  if (tableName) return getAll(tableName);
+  return [];
+}
+
+export function getOne(table: string, field: string, value: any): any | null {
+  const items = getAll(table);
+  return items.find(item => String(item[field]) === String(value)) || null;
+}
+
+export function insert(table: string, data: Record<string, any>): void {
+  if (!dbStore[table]) dbStore[table] = [];
+  
+  // Handle auto-increment if possible
+  const config = entities.find(e => e.table === table);
+  if (config) {
+    const pkField = config.fields.find(f => f.isPrimaryKey);
+    if (pkField && pkField.autoIncrement && !data[pkField.name]) {
+      const maxId = dbStore[table].reduce((max, item) => Math.max(max, Number(item[pkField.name] || 0)), 0);
+      data[pkField.name] = maxId + 1;
+    }
+  }
+
+  dbStore[table].push(data);
+  saveDb();
+}
+
+export function updateRecord(table: string, pkField: string, pkValue: any, data: Record<string, any>): void {
+  if (!dbStore[table]) return;
+  const index = dbStore[table].findIndex(item => String(item[pkField]) === String(pkValue));
+  if (index !== -1) {
+    dbStore[table][index] = { ...dbStore[table][index], ...data };
+    saveDb();
+  }
+}
+
+export function removeRecord(table: string, pkField: string, pkValue: any): void {
+  if (!dbStore[table]) return;
+  dbStore[table] = dbStore[table].filter(item => String(item[pkField]) !== String(pkValue));
+  saveDb();
+}
+
 export function addHistoriqueEntry(
   userId: string | null,
   action: string,
@@ -69,9 +112,7 @@ export function addHistoriqueEntry(
   message: string,
   isAlert: boolean = false
 ): void {
-  const db = getDb();
-  db.historique = db.historique || [];
-  db.historique.push({
+  const entry = {
     id_historique: Date.now(),
     user_id: userId,
     action,
@@ -80,56 +121,45 @@ export function addHistoriqueEntry(
     nom_connexion: nomConnexion,
     message,
     is_alert: isAlert ? 1 : 0
-  });
-  saveDatabase(db);
+  };
+  insert("historique", entry);
 }
 
 export function getHistorique(): any[] {
-  const db = getDb();
-  return (db.historique || []).sort((a: any, b: any) => 
+  return [...getAll("historique")].sort((a, b) => 
     new Date(b.date_action).getTime() - new Date(a.date_action).getTime()
   );
 }
 
-// Generic CRUD functions
-export function getAll(table: string): any[] {
-  const db = getDb();
-  return db[table] || [];
+export function resetDatabase(): void {
+  localStorage.removeItem(DB_KEY);
+  window.location.reload();
 }
 
-export function insert(table: string, data: Record<string, any>, pkField: string = "id"): void {
-  const db = getDb();
-  db[table] = db[table] || [];
-  
-  // Auto-increment logic
-  const maxId = db[table].reduce((max: number, item: any) => Math.max(max, parseInt(item[pkField]) || 0), 0);
-  
-  const newRecord = {
-    ...data,
-    [pkField]: maxId + 1,
-    created_at: new Date().toISOString()
+export function exportDb(): void {
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dbStore, null, 2));
+  const downloadAnchorNode = document.createElement('a');
+  downloadAnchorNode.setAttribute("href", dataStr);
+  downloadAnchorNode.setAttribute("download", "labo_backup.json");
+  document.body.appendChild(downloadAnchorNode);
+  downloadAnchorNode.click();
+  downloadAnchorNode.remove();
+}
+
+export async function importDb(file: File): Promise<void> {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target?.result as string);
+      dbStore = data;
+      saveDb();
+      window.location.reload();
+    } catch (err) {
+      alert("Fichier invalide");
+    }
   };
-  
-  db[table].push(newRecord);
-  saveDatabase(db);
+  reader.readAsText(file);
 }
 
-export function updateRecord(table: string, pkField: string, pkValue: any, data: Record<string, any>): void {
-  const db = getDb();
-  const idx = db[table]?.findIndex((item: any) => String(item[pkField]) === String(pkValue));
-  if (idx !== -1 && idx !== undefined) {
-    db[table][idx] = { ...db[table][idx], ...data };
-    saveDatabase(db);
-  }
-}
-
-export function removeRecord(table: string, pkField: string, pkValue: any): void {
-  const db = getDb();
-  db[table] = (db[table] || []).filter((item: any) => String(item[pkField]) !== String(pkValue));
-  saveDatabase(db);
-}
-
-// Initialize on module load
-if (typeof window !== "undefined") {
-  initializeDatabase();
-}
+// Keep the same export name as requested by components
+export { dbStore as sqliteDb };

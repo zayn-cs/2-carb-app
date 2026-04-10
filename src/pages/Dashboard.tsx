@@ -4,19 +4,26 @@ import { AppSidebar } from "@/components/AppSidebar";
 import EntityPage from "@/components/EntityPage";
 import { entities, entityGroups } from "@/lib/entityConfig";
 import { useAuth } from "@/hooks/useAuth";
-import { FlaskConical, ArrowRight, Layers } from "lucide-react";
+import { FlaskConical, ArrowRight, Layers, LogOut } from "lucide-react";
 import { AnimatedBackground } from "@/components/AnimatedBackground";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getAll } from "@/lib/db";
+import { getAll, initSqlDatabase } from "@/lib/db";
 import { useLoading } from "@/context/LoadingContext";
 
 export default function Dashboard() {
   const { entity, sectionName } = useParams();
-  const { user, loading } = useAuth();
+  const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const { showLoading } = useLoading();
+  const [dbReady, setDbReady] = useState<boolean>(false);
+
+  useEffect(() => {
+    initSqlDatabase()
+      .then(() => setDbReady(true))
+      .catch(console.error);
+  }, []);
 
   const handleNavigation = (path: string) => {
     showLoading(600);
@@ -62,7 +69,6 @@ export default function Dashboard() {
               </div>
               <div>
                 <h1 className="text-5xl font-black text-slate-900 tracking-tighter uppercase">{currentSection.label}</h1>
-                <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] mt-1">Secteur de Gestion / Données Analytiques</p>
               </div>
             </div>
             <Button variant="outline" className="rounded-xl border-slate-200 font-bold px-6" onClick={() => handleNavigation("/dashboard")}>
@@ -86,7 +92,6 @@ export default function Dashboard() {
                       </div>
                     </div>
                     <CardTitle className="mt-6 text-2xl font-black text-slate-800 uppercase tracking-tight group-hover:text-primary transition-colors">{item.label}</CardTitle>
-                    <CardDescription className="font-bold text-slate-400 text-xs uppercase tracking-wider">Base de données: {item.table}</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <div className="flex items-center text-xs font-black uppercase tracking-[0.1em] text-primary group-hover:translate-x-2 transition-transform">
@@ -118,13 +123,10 @@ export default function Dashboard() {
         
         <div className="space-y-4 max-w-2xl">
           
-          <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-[0.95]">
-            Bienvenue sur le Portail <span className="text-primary">LABO</span>
-          </h2>
           
-          <p className="text-slate-400 font-bold text-lg uppercase tracking-tight max-w-lg mx-auto py-4">
-            Direction Centrale des Carburants - Command Center
-          </p>
+          <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-[0.95]">
+            Bienvenue sur le Portail <span className="text-primary">Labo Carburants</span>
+          </h2>
           
           <div className="grid grid-cols-2 gap-6 mt-12 w-full max-w-2xl px-4">
             {entityGroups.map(group => (
@@ -161,10 +163,19 @@ export default function Dashboard() {
                 {currentEntity?.label || currentSection?.label || "Tableau de bord"}
               </h2>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium px-2 py-1 bg-primary/10 text-primary rounded-full">
+            <div className="flex items-center gap-4">
+              <span className="text-[10px] font-black tracking-widest px-3 py-1.5 bg-primary/10 text-primary rounded-lg border border-primary/20 uppercase">
                 Session: {user.nom}
               </span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={signOut}
+                className="h-9 px-4 text-red-500 hover:text-white hover:bg-red-500 transition-all rounded-xl font-black tracking-widest text-[10px] group"
+              >
+                <LogOut className="h-4 w-4 mr-2 transition-transform group-hover:-translate-x-0.5" />
+                DÉCONNEXION
+              </Button>
             </div>
           </header>
           {renderContent()}
