@@ -69,7 +69,7 @@ export const entities: EntityConfig[] = [
       { name: "id_organisme", label: "ID Organisme", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "nom_organisme", label: "Nom Organisme", type: "text", required: true },
       { name: "adresse_organisme", label: "Adresse", type: "text" },
-      { name: "contact_organisme", label: "Contact", type: "text" },
+      { name: "contact_organisme", label: "Contact", type: "number" },
       { name: "lieu_organisme", label: "Lieu", type: "text" },
     ],
   },
@@ -82,7 +82,7 @@ export const entities: EntityConfig[] = [
       { name: "id_laboratoire", label: "ID Laboratoire", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "nom_labo", label: "Nom Laboratoire", type: "text", required: true },
       { name: "lieu_labo", label: "Lieu", type: "text" },
-      { name: "contact_labo", label: "Contact", type: "text" },
+      { name: "contact_labo", label: "Contact", type: "number" },
       { 
         name: "region", 
         label: "Région", 
@@ -135,7 +135,12 @@ export const entities: EntityConfig[] = [
       { name: "matricule", label: "Matricule", type: "number", required: true, isUnique: true },
       { name: "nom_laboriste", label: "Nom", type: "text", required: true },
       { name: "prenom", label: "Prénom", type: "text" },
-      { name: "sexe", label: "Sexe", type: "text" },
+      { 
+        name: "sexe", 
+        label: "Sexe", 
+        type: "select", 
+        options: ["Homme", "Femme"] 
+      },
       { name: "date_naissance", label: "Date Naissance", type: "date" },
       { name: "lieu_naissance", label: "Lieu Naissance", type: "text" },
       { 
