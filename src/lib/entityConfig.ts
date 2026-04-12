@@ -310,12 +310,12 @@ export const entities: EntityConfig[] = [
     ],
   },
   {
-    key: "affectation",
-    table: "affectation",
-    label: "Affectation",
+    key: "emploie",
+    table: "emploie",
+    label: "Emploie",
     icon: Briefcase,
     fields: [
-      { name: "id_affectation", label: "ID Affectation", type: "number", isPrimaryKey: true, autoIncrement: true },
+      { name: "id_emploie", label: "ID Emploie", type: "number", isPrimaryKey: true, autoIncrement: true },
       { name: "date_join", label: "Date de Join", type: "date", required: true },
       { name: "date_sortie", label: "Date de Sortie", type: "date" },
       { 
@@ -350,7 +350,7 @@ export const entityGroups = [
   {
     label: "Ressources",
     key: "ressources",
-    items: ["laboriste", "diplome", "equipement", "etalonnage", "affectation"],
+    items: ["laboriste", "diplome", "equipement", "etalonnage", "emploie"],
   },
   {
     label: "Système",

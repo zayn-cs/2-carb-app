@@ -6,7 +6,13 @@ const DB_KEY = "dcc_app_db_v2";
 // Initialize the database in memory
 let dbStore: Record<string, any[]> = {};
 
-export async function initSqlDatabase(): Promise<void> {
+const BACKEND_URL = "http://localhost:3001/api";
+
+let isInitialized = false;
+
+export async function initSqlDatabase(force: boolean = false): Promise<void> {
+  if (isInitialized && !force) return;
+
   const saved = localStorage.getItem(DB_KEY);
   if (saved) {
     try {
@@ -20,29 +26,66 @@ export async function initSqlDatabase(): Promise<void> {
     dbStore = {};
   }
 
-  // Ensure all tables exist and are seeded if empty
-  Object.keys(initialData).forEach(table => {
-    if (!dbStore[table] || dbStore[table].length === 0) {
-      dbStore[table] = initialData[table];
-    } else if (table === "utilisateur") {
-      // Special case: sync users from initialData so code changes are reflected
-      initialData.utilisateur.forEach(u => {
-        const idx = dbStore[table].findIndex(exist => exist.id_user === u.id_user);
-        if (idx === -1) {
-          dbStore[table].push(u);
+  console.log("Syncing with PostgreSQL...");
+  const syncedTables = new Set<string>();
+
+  // Fetch from Express Postgres Backend for ALL tables to act as Source of Truth
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout to avoid infinite loading
+    
+    // Attempt parallel fetch of all tables mapped in entityConfig + historique
+    const tableNames = [...entities.map(e => e.table), 'historique'];
+    
+    const fetchPromises = tableNames.map(async (table) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/${table}`, { signal: controller.signal });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            dbStore[table] = data; // Directly fill from backend
+            syncedTables.add(table);
+          }
         } else {
-          dbStore[table][idx] = { ...dbStore[table][idx], ...u };
+           console.warn(`Backend returned ${res.status} for table: ${table}`);
         }
-      });
+      } catch (err) {
+        console.error(`Fetch failed for table ${table}:`, err);
+      }
+    });
+
+    await Promise.all(fetchPromises);
+    clearTimeout(timeoutId);
+    console.log(`Initial tables synced from PostgreSQL! (${syncedTables.size}/${tableNames.length} tables)`);
+    isInitialized = true;
+  } catch(err) {
+    console.error("Critical network error or timeout syncing from Postgres", err);
+  }
+
+  // Fallback to initialData ONLY for tables that didn't sync AND are empty
+  Object.keys(initialData).forEach(table => {
+    // If table wasn't synced from Postgres AND it doesn't have any data yet
+    if (!syncedTables.has(table)) {
+      if (!dbStore[table] || dbStore[table].length === 0) {
+        console.log(`Using demo data for table: ${table} (Sync failed or database empty)`);
+        dbStore[table] = initialData[table];
+      }
     }
   });
 
-  // Ensure all entities defined in config exist in the store
+  // Final check: ensure every config table is at least an empty array
+  // Final check: ensure every config table is at least an empty array
   entities.forEach(entity => {
     if (!dbStore[entity.table]) {
       dbStore[entity.table] = [];
     }
   });
+
+  // Special case: If utilisateur is empty (even after sync), add the default admin to prevent lockout
+  if (!dbStore["utilisateur"] || dbStore["utilisateur"].length === 0) {
+    console.log("Adding default admin user (DB empty)");
+    dbStore["utilisateur"] = initialData.utilisateur;
+  }
 
   saveDb();
   console.log("Database initialized (JSON method)");
@@ -85,6 +128,13 @@ export function insert(table: string, data: Record<string, any>): void {
 
   dbStore[table].push(data);
   saveDb();
+
+  // Sync to PostgreSQL backend
+  fetch(`${BACKEND_URL}/${table}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  }).catch(err => console.error("Error syncing insert", err));
 }
 
 export function updateRecord(table: string, pkField: string, pkValue: any, data: Record<string, any>): void {
@@ -93,6 +143,13 @@ export function updateRecord(table: string, pkField: string, pkValue: any, data:
   if (index !== -1) {
     dbStore[table][index] = { ...dbStore[table][index], ...data };
     saveDb();
+
+    // Sync to PostgreSQL backend
+    fetch(`${BACKEND_URL}/${table}/${pkField}/${pkValue}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    }).catch(err => console.error("Error syncing update", err));
   }
 }
 
@@ -100,6 +157,11 @@ export function removeRecord(table: string, pkField: string, pkValue: any): void
   if (!dbStore[table]) return;
   dbStore[table] = dbStore[table].filter(item => String(item[pkField]) !== String(pkValue));
   saveDb();
+
+  // Sync to PostgreSQL backend
+  fetch(`${BACKEND_URL}/${table}/${pkField}/${pkValue}`, {
+    method: "DELETE"
+  }).catch(err => console.error("Error syncing delete", err));
 }
 
 export function addHistoriqueEntry(

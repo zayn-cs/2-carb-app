@@ -27,8 +27,9 @@ export default function Auth() {
         // Pre-fill fields from the first user in the database
         const users = getAll("utilisateur");
         if (users && users.length > 0) {
-          setUsername(users[0].nom_user || "");
-          setPassword(users[0].password || "");
+          // Auto-fill removed per user request
+          // setUsername(users[0].nom_user || "");
+          // setPassword(users[0].password || "");
         }
       })
       .catch(err => {

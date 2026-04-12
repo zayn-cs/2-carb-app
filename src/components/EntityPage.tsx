@@ -36,21 +36,18 @@ export default function EntityPage({ config }: EntityPageProps) {
 
   const fetchItems = async () => {
     try {
-      await initSqlDatabase();
-      let data: any[] = [];
-      if (config.key === "historique") {
-        data = getHistorique();
-      } else {
-        data = getAll(config.table);
-      }
-
+      await initSqlDatabase(true);
+      const itemsData = config.key === "historique" ? getHistorique() : getAll(config.table);
+      const data = Array.isArray(itemsData) ? itemsData : [];
+      
       // Fetch lookup data for foreign keys
       const lookupData: Record<string, any[]> = {};
       for (const field of config.fields) {
         if (field.foreignKey) {
           const parentEntity = field.foreignKey.entity;
           const parentTable = parentEntity === "user" ? "utilisateur" : parentEntity; 
-          lookupData[field.name] = getAll(parentTable);
+          const rawParentData = getAll(parentTable);
+          lookupData[field.name] = Array.isArray(rawParentData) ? rawParentData : [];
         }
       }
       setParentData(lookupData);
