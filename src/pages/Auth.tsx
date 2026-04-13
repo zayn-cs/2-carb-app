@@ -76,25 +76,18 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      const users = getUnifiedUsers();
-      
-      console.log("Login attempt - username:", username, "password:", password);
-      console.log("Users from DB:", users);
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const users = getAll("utilisateur");
       
       const user = users.find(u => u.nom_user && u.nom_user.trim().toLowerCase() === username.trim().toLowerCase());
-      console.log("Found user:", user);
 
       if (!user) {
-        console.log("User not found for:", username);
         logHistorique("Tentative de connexion", username, false, "Identifiants incorrects", false);
         toast({ title: "Erreur", description: "Nom d'utilisateur incorrect", variant: "destructive" });
         setLoading(false);
         return;
       }
 
-      console.log("Password check - input:", password, "stored:", user.password, "match:", user.password === password);
-      
       if (user.password !== password) {
         logHistorique("Tentative de connexion", username, false, "Mot de passe incorrect", false);
         toast({ title: "Erreur", description: "Mot de passe incorrect", variant: "destructive" });
@@ -102,17 +95,32 @@ export default function Auth() {
         return;
       }
 
-      console.log("Login successful for:", user.nom_user);
-
-      // IP binding - only lock to IP if the user has an IP set and IP is available
-      if (user.ip_address && ipAddress && user.ip_address !== ipAddress) {
-        logHistorique("Alerte Sécurité", username, false, `IP non autorisé: ${ipAddress}`, true, user.id_user);
-        toast({ title: "Accès Refusé", description: "Ce compte est lié à un autre appareil (IP: " + user.ip_address + ")", variant: "destructive" });
+      // 1. Check if ANY OTHER user is already using this IP/Device
+      const otherUserWithSameIP = users.find(u => u.ip_address === ipAddress && u.id_user !== user.id_user);
+      if (otherUserWithSameIP) {
+        logHistorique("Alerte Sécurité", username, false, `IP déjà utilisé par ${otherUserWithSameIP.nom_user}`, true, user.id_user);
+        toast({ 
+          title: "Accès Refusé", 
+          description: "Cet appareil est lié à un autre compte utilisateur. Impossible de se connecter ici.", 
+          variant: "destructive" 
+        });
         setLoading(false);
         return;
       }
 
-      // First login - bind to current IP
+      // 2. IP binding check - if user is already locked to a different IP
+      if (user.ip_address && ipAddress && user.ip_address !== ipAddress) {
+        logHistorique("Alerte Sécurité", username, false, `Tentative depuis IP non autorisé: ${ipAddress}`, true, user.id_user);
+        toast({ 
+          title: "Appareil Non Reconnu", 
+          description: "Ce compte est strictement lié à votre appareil d'origine (IP: " + user.ip_address + ")", 
+          variant: "destructive" 
+        });
+        setLoading(false);
+        return;
+      }
+
+      // 3. First login - Bind this user to this IP permanently
       let userIp = user.ip_address;
       if (!user.ip_address && ipAddress) {
         updateRecord("utilisateur", "id_user", user.id_user, { ip_address: ipAddress });
@@ -124,10 +132,10 @@ export default function Auth() {
       sessionStorage.setItem("currentUser", JSON.stringify(sessionUser));
       signIn(sessionUser);
       
-      toast({ title: "✓ Bienvenue", description: `Ravi de vous revoir, ${user.nom_user}` });
+      toast({ title: "✓ Authentification Réussie", description: `Bienvenue sur votre poste de travail, ${user.nom_user}` });
       navigate("/dashboard");
     } catch (error: any) {
-      toast({ title: "Erreur", description: error.message, variant: "destructive" });
+      toast({ title: "Erreur Système", description: error.message, variant: "destructive" });
     }
     setLoading(false);
   };

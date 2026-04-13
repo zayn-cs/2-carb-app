@@ -1,8 +1,6 @@
 import { initialData } from "./initialData";
 import { entities } from "./entityConfig";
 
-const DB_KEY = "dcc_app_db_v2";
-
 // Initialize the database in memory
 let dbStore: Record<string, any[]> = {};
 
@@ -13,19 +11,7 @@ let isInitialized = false;
 export async function initSqlDatabase(force: boolean = false): Promise<void> {
   if (isInitialized && !force) return;
 
-  const saved = localStorage.getItem(DB_KEY);
-  if (saved) {
-    try {
-      dbStore = JSON.parse(saved);
-      console.log("Database loaded from localStorage");
-    } catch (e) {
-      console.error("Failed to parse database, resetting", e);
-      dbStore = {};
-    }
-  } else {
-    dbStore = {};
-  }
-
+  dbStore = {}; // Clean memory before sync
   console.log("Syncing with PostgreSQL...");
   const syncedTables = new Set<string>();
 
@@ -74,7 +60,6 @@ export async function initSqlDatabase(force: boolean = false): Promise<void> {
   });
 
   // Final check: ensure every config table is at least an empty array
-  // Final check: ensure every config table is at least an empty array
   entities.forEach(entity => {
     if (!dbStore[entity.table]) {
       dbStore[entity.table] = [];
@@ -87,13 +72,8 @@ export async function initSqlDatabase(force: boolean = false): Promise<void> {
     dbStore["utilisateur"] = initialData.utilisateur;
   }
 
-  saveDb();
-  console.log("Database initialized (JSON method)");
+  console.log("Database initialized (Memory only)");
   return Promise.resolve();
-}
-
-export function saveDb(): void {
-  localStorage.setItem(DB_KEY, JSON.stringify(dbStore));
 }
 
 export function getAll(table: string): any[] {
@@ -127,7 +107,6 @@ export function insert(table: string, data: Record<string, any>): void {
   }
 
   dbStore[table].push(data);
-  saveDb();
 
   // Sync to PostgreSQL backend
   fetch(`${BACKEND_URL}/${table}`, {
@@ -142,7 +121,6 @@ export function updateRecord(table: string, pkField: string, pkValue: any, data:
   const index = dbStore[table].findIndex(item => String(item[pkField]) === String(pkValue));
   if (index !== -1) {
     dbStore[table][index] = { ...dbStore[table][index], ...data };
-    saveDb();
 
     // Sync to PostgreSQL backend
     fetch(`${BACKEND_URL}/${table}/${pkField}/${pkValue}`, {
@@ -156,7 +134,6 @@ export function updateRecord(table: string, pkField: string, pkValue: any, data:
 export function removeRecord(table: string, pkField: string, pkValue: any): void {
   if (!dbStore[table]) return;
   dbStore[table] = dbStore[table].filter(item => String(item[pkField]) !== String(pkValue));
-  saveDb();
 
   // Sync to PostgreSQL backend
   fetch(`${BACKEND_URL}/${table}/${pkField}/${pkValue}`, {
@@ -194,8 +171,8 @@ export function getHistorique(): any[] {
 }
 
 export function resetDatabase(): void {
-  localStorage.removeItem(DB_KEY);
-  window.location.reload();
+  // Now simply forces a full sync
+  initSqlDatabase(true).then(() => window.location.reload());
 }
 
 export function exportDb(): void {
@@ -214,7 +191,7 @@ export async function importDb(file: File): Promise<void> {
     try {
       const data = JSON.parse(e.target?.result as string);
       dbStore = data;
-      saveDb();
+      // Syncing import to DB would require a lot of requests. Usually best to restart server with new DB.
       window.location.reload();
     } catch (err) {
       alert("Fichier invalide");
